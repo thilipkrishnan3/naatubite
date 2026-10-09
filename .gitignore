@@ -1,6 +1,27 @@
+# Operating System & Editor Files
 .DS_Store
+Thumbs.db
 *.log
+
+# Environment Variables & Local Configurations
 .env
 .env.local
 .env.*.local
+*.env
 env.js
+
+# Allow public templates
+!.env.example
+!env.example.js
+
+# Secret Keys, Tokens, Credentials & Passwords
+*secret*
+*credential*
+*token*
+*password*
+*api_key*
+*apikey*
+*.pem
+*.key
+*.id_rsa
+*.id_ed25519
