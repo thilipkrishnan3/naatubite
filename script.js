@@ -13,7 +13,7 @@
 // 1. PRODUCT CATALOG DATA (LOCAL AUTHENTIC FOOD IMAGES)
 // ============================================================================
 // Note: Every product price is kept strictly below ₹200 as requested!
-const PRODUCTS = [
+let PRODUCTS = [
   // --- CATEGORY 1: SNACKS ---
   {
     id: "snack-01",
@@ -299,10 +299,51 @@ function initSupabase() {
     try {
       supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey);
       console.log("Supabase client initialized with publishable key!");
+      loadProductsFromSupabase();
     } catch (err) {
       console.warn("Supabase init:", err);
     }
   }
+}
+
+// Dynamically sync products from Supabase 'products' table if available
+function loadProductsFromSupabase() {
+  if (!supabaseClient) return;
+  supabaseClient
+    .from("products")
+    .select("*")
+    .eq("is_active", true)
+    .order("id")
+    .then(({ data, error }) => {
+      if (error) {
+        console.info("Supabase products note (using local catalog fallback):", error.message);
+        return;
+      }
+      if (data && data.length > 0) {
+        PRODUCTS = data.map(p => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          categoryLabel: p.category_label || p.category,
+          weight: p.weight,
+          price: Number(p.price),
+          originalPrice: Number(p.original_price),
+          image: p.image_url,
+          alt: p.alt_text,
+          description: p.description,
+          badge: p.badge || "",
+          badgeClass: p.badge_class || "",
+          ingredients: p.ingredients,
+          shelfLife: p.shelf_life
+        }));
+        updateCategoryCounts();
+        renderProducts();
+        console.log(`Loaded ${PRODUCTS.length} products dynamically from Supabase database!`);
+      }
+    })
+    .catch(err => {
+      console.info("Supabase products note (using local fallback):", err.message || err);
+    });
 }
 
 const APP_CONFIG = {
@@ -791,31 +832,68 @@ function handlePlaceOrder(event) {
   document.getElementById("receiptDelivery").textContent = delivery === 0 ? "FREE" : `₹${delivery}`;
   document.getElementById("receiptGrandTotal").textContent = `₹${total}`;
 
-  // Sync Order to Supabase if connected
+  // Sync Order to Supabase relational tables if connected
   if (supabaseClient) {
     try {
       const orderPayload = {
         order_id: orderId,
         customer_name: name,
         phone: phone,
-        address: fullAddress,
-        items: cart.map(i => ({ name: i.name, weight: i.weight, qty: i.quantity, price: i.price })),
+        delivery_address: address,
+        landmark: landmark || null,
+        city: city,
+        pincode: pincode,
         subtotal: subtotal,
         delivery_fee: delivery,
         total_amount: total,
         payment_method: paymentMethod,
-        status: "received",
-        created_at: new Date().toISOString()
+        payment_status: paymentMethod === "cod" ? "pending" : "completed",
+        order_status: "received"
       };
-      supabaseClient.from("orders").insert([orderPayload]).then(({ data, error }) => {
-        if (error) {
-          console.info("Supabase sync info (table orders pending in Supabase):", error.message);
-        } else {
-          console.log("Order saved to Supabase successfully!");
-        }
-      }).catch(err => {
-        console.info("Supabase orders sync note (will persist when Supabase project URL is active):", err.message || err);
-      });
+
+      // 1. Insert order record
+      supabaseClient
+        .from("orders")
+        .insert([orderPayload])
+        .select()
+        .then(({ data, error }) => {
+          if (error) {
+            console.info("Supabase sync info (table orders pending in Supabase):", error.message);
+            return;
+          }
+          if (data && data.length > 0) {
+            const insertedOrder = data[0];
+            console.log(`Order ${orderId} saved to Supabase (id: ${insertedOrder.id})`);
+
+            // 2. Insert line items into relational order_items table
+            const itemsPayload = cart.map(item => ({
+              order_ref_id: insertedOrder.id,
+              product_id: item.id || null,
+              product_name: item.name,
+              weight: item.weight,
+              unit_price: item.price,
+              quantity: item.quantity,
+              item_total: item.price * item.quantity
+            }));
+
+            supabaseClient
+              .from("order_items")
+              .insert(itemsPayload)
+              .then(({ error: itemsError }) => {
+                if (itemsError) {
+                  console.info("Supabase order_items sync note:", itemsError.message);
+                } else {
+                  console.log("Order items saved to Supabase successfully!");
+                }
+              })
+              .catch(err => {
+                console.info("Supabase order_items sync note:", err.message || err);
+              });
+          }
+        })
+        .catch(err => {
+          console.info("Supabase orders sync note (will persist when Supabase project URL is active):", err.message || err);
+        });
     } catch (err) {
       console.warn("Supabase order sync:", err);
     }
@@ -980,12 +1058,15 @@ function handleContactSubmit(event) {
       supabaseClient.from("contact_messages").insert([{
         name: name,
         phone: phone,
-        email: email,
+        email: email || null,
         subject: subject,
-        message: message,
-        created_at: new Date().toISOString()
+        message: message
       }]).then(({ error }) => {
-        if (!error) console.log("Contact message saved to Supabase!");
+        if (error) {
+          console.info("Supabase contact_messages note:", error.message);
+        } else {
+          console.log("Contact message saved to Supabase successfully!");
+        }
       }).catch(err => {
         console.info("Supabase contact sync note:", err.message || err);
       });
