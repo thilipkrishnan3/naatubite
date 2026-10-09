@@ -287,22 +287,71 @@ let currentSort = "featured";
 
 // Configuration Settings
 // Supabase Database Configuration
-const SUPABASE_CONFIG = {
-  // Enter your Project URL from Supabase Dashboard -> Project Settings -> API
-  url: "https://yoz9ga7gljt423xs1tqcmg.supabase.co", 
-  publishableKey: "sb_publishable_yoz9Ga7gLJt423Xs1tqCmg_HkJiooSM"
-};
-
+// ============================================================================
+// Supabase Configuration from Environment Variables
+// (Loaded securely via env.js / window.__ENV__ or local .env file)
+// NEVER hardcode or commit API keys or service_role secret keys to Git.
+// ============================================================================
 let supabaseClient = null;
-function initSupabase() {
-  if (window.supabase && SUPABASE_CONFIG.publishableKey) {
+
+// Resolve Supabase credentials exclusively from environment variables
+function getSupabaseEnvConfig() {
+  const env = (typeof window !== "undefined" && window.__ENV__) || {};
+  return {
+    url: (env.SUPABASE_URL || "").trim(),
+    publishableKey: (env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || "").trim()
+  };
+}
+
+async function initSupabase() {
+  let config = getSupabaseEnvConfig();
+
+  // If window.__ENV__ is not populated yet, attempt to load from local .env
+  if (!config.url || !config.publishableKey) {
     try {
-      supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey);
-      console.log("Supabase client initialized with publishable key!");
-      loadProductsFromSupabase();
-    } catch (err) {
-      console.warn("Supabase init:", err);
+      const res = await fetch(".env");
+      if (res.ok) {
+        const text = await res.text();
+        const parsed = {};
+        text.split("\n").forEach(line => {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith("#")) {
+            const idx = trimmed.indexOf("=");
+            if (idx > -1) {
+              const k = trimmed.substring(0, idx).trim();
+              const v = trimmed.substring(idx + 1).trim();
+              parsed[k] = v;
+            }
+          }
+        });
+        window.__ENV__ = Object.assign(window.__ENV__ || {}, parsed);
+        config = getSupabaseEnvConfig();
+      }
+    } catch (_) {
+      // Local fetch fallback not available or blocked
     }
+  }
+
+  if (!config.url || !config.publishableKey) {
+    console.info(
+      "[Supabase] Environment variables not detected. Please define SUPABASE_URL and SUPABASE_ANON_KEY in env.js or .env. Running in standalone offline mode."
+    );
+    return false;
+  }
+
+  if (!window.supabase) {
+    console.warn("[Supabase] Supabase JS library not loaded.");
+    return false;
+  }
+
+  try {
+    supabaseClient = window.supabase.createClient(config.url, config.publishableKey);
+    console.log("[Supabase] Client successfully initialized from environment variables!");
+    loadProductsFromSupabase();
+    return true;
+  } catch (err) {
+    console.warn("[Supabase] Initialization error:", err);
+    return false;
   }
 }
 
