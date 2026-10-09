@@ -694,11 +694,37 @@ function handlePaymentMethodChange(method) {
 }
 
 function copyUpiId() {
-  navigator.clipboard.writeText(APP_CONFIG.upiId).then(() => {
-    showToast("UPI ID copied to clipboard! 📋", "success");
-  }).catch(() => {
-    showToast(`UPI ID: ${APP_CONFIG.upiId}`, "info");
-  });
+  const upiId = APP_CONFIG.upiId;
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    navigator.clipboard.writeText(upiId).then(() => {
+      showToast("UPI ID copied to clipboard! 📋", "success");
+    }).catch(() => {
+      fallbackCopyText(upiId);
+    });
+  } else {
+    fallbackCopyText(upiId);
+  }
+}
+
+function fallbackCopyText(text) {
+  try {
+    const tempInput = document.createElement("textarea");
+    tempInput.value = text;
+    tempInput.style.position = "fixed";
+    tempInput.style.opacity = "0";
+    document.body.appendChild(tempInput);
+    tempInput.focus();
+    tempInput.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(tempInput);
+    if (successful) {
+      showToast("UPI ID copied to clipboard! 📋", "success");
+    } else {
+      showToast(`UPI ID: ${text}`, "info");
+    }
+  } catch (err) {
+    showToast(`UPI ID: ${text}`, "info");
+  }
 }
 
 // ============================================================================
@@ -783,10 +809,12 @@ function handlePlaceOrder(event) {
       };
       supabaseClient.from("orders").insert([orderPayload]).then(({ data, error }) => {
         if (error) {
-          console.info("Supabase sync info (create table orders in Supabase to persist):", error.message);
+          console.info("Supabase sync info (table orders pending in Supabase):", error.message);
         } else {
           console.log("Order saved to Supabase successfully!");
         }
+      }).catch(err => {
+        console.info("Supabase orders sync note (will persist when Supabase project URL is active):", err.message || err);
       });
     } catch (err) {
       console.warn("Supabase order sync:", err);
@@ -958,6 +986,8 @@ function handleContactSubmit(event) {
         created_at: new Date().toISOString()
       }]).then(({ error }) => {
         if (!error) console.log("Contact message saved to Supabase!");
+      }).catch(err => {
+        console.info("Supabase contact sync note:", err.message || err);
       });
     } catch (err) {
       console.warn("Supabase contact sync:", err);
@@ -1065,6 +1095,19 @@ function setupEventListeners() {
       });
     });
   }
+
+  // Backdrop click dismisses modals
+  ["checkoutModalOverlay", "productModalOverlay"].forEach(id => {
+    const overlay = document.getElementById(id);
+    if (overlay) {
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+          if (id === "checkoutModalOverlay") closeCheckout();
+          if (id === "productModalOverlay") closeProductModal();
+        }
+      });
+    }
+  });
 
   // Escape key closes open modals
   document.addEventListener("keydown", (e) => {
