@@ -286,6 +286,25 @@ let currentSearchQuery = "";
 let currentSort = "featured";
 
 // Configuration Settings
+// Supabase Database Configuration
+const SUPABASE_CONFIG = {
+  // Enter your Project URL from Supabase Dashboard -> Project Settings -> API
+  url: "https://yoz9ga7gljt423xs1tqcmg.supabase.co", 
+  publishableKey: "sb_publishable_yoz9Ga7gLJt423Xs1tqCmg_HkJiooSM"
+};
+
+let supabaseClient = null;
+function initSupabase() {
+  if (window.supabase && SUPABASE_CONFIG.publishableKey) {
+    try {
+      supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey);
+      console.log("Supabase client initialized with publishable key!");
+    } catch (err) {
+      console.warn("Supabase init:", err);
+    }
+  }
+}
+
 const APP_CONFIG = {
   freeShippingThreshold: 299,
   deliveryFee: 40,
@@ -298,6 +317,7 @@ const APP_CONFIG = {
 // 3. INITIALIZATION ON PAGE LOAD
 // ============================================================================
 document.addEventListener("DOMContentLoaded", () => {
+  initSupabase();
   loadCartFromStorage();
   updateCategoryCounts();
   renderProducts();
@@ -745,6 +765,34 @@ function handlePlaceOrder(event) {
   document.getElementById("receiptDelivery").textContent = delivery === 0 ? "FREE" : `₹${delivery}`;
   document.getElementById("receiptGrandTotal").textContent = `₹${total}`;
 
+  // Sync Order to Supabase if connected
+  if (supabaseClient) {
+    try {
+      const orderPayload = {
+        order_id: orderId,
+        customer_name: name,
+        phone: phone,
+        address: fullAddress,
+        items: cart.map(i => ({ name: i.name, weight: i.weight, qty: i.quantity, price: i.price })),
+        subtotal: subtotal,
+        delivery_fee: delivery,
+        total_amount: total,
+        payment_method: paymentMethod,
+        status: "received",
+        created_at: new Date().toISOString()
+      };
+      supabaseClient.from("orders").insert([orderPayload]).then(({ data, error }) => {
+        if (error) {
+          console.info("Supabase sync info (create table orders in Supabase to persist):", error.message);
+        } else {
+          console.log("Order saved to Supabase successfully!");
+        }
+      });
+    } catch (err) {
+      console.warn("Supabase order sync:", err);
+    }
+  }
+
   // Clear Cart
   cart = [];
   saveCartToStorage();
@@ -894,6 +942,28 @@ function toggleFaq(btn) {
 function handleContactSubmit(event) {
   event.preventDefault();
   const name = document.getElementById("contactName").value;
+  const phone = document.getElementById("contactPhone")?.value || "";
+  const email = document.getElementById("contactEmail")?.value || "";
+  const subject = document.getElementById("contactSubject")?.value || "";
+  const message = document.getElementById("contactMessage")?.value || "";
+
+  if (supabaseClient) {
+    try {
+      supabaseClient.from("contact_messages").insert([{
+        name: name,
+        phone: phone,
+        email: email,
+        subject: subject,
+        message: message,
+        created_at: new Date().toISOString()
+      }]).then(({ error }) => {
+        if (!error) console.log("Contact message saved to Supabase!");
+      });
+    } catch (err) {
+      console.warn("Supabase contact sync:", err);
+    }
+  }
+
   showToast(`Thank you, ${name}! Your message has been received. Our kitchen team will contact you shortly.`, "success");
   event.target.reset();
 }
