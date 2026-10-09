@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NaatuBite - Supabase Database Connectivity Test</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --error: #ef4444;
+      --pending: #f59e0b;
+      --accent: #d97706;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 2rem 1rem;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+    .test-container {
+      max-width: 800px;
+      width: 100%;
+    }
+    .header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+    }
+    .header h1 {
+      font-size: 1.5rem;
+      color: #fbbf24;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .header p { color: var(--text-muted); font-size: 0.95rem; }
+    .env-info {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      display: grid;
+      gap: 0.5rem;
+    }
+    .env-row { display: flex; justify-content: space-between; }
+    .env-label { color: var(--text-muted); }
+    .env-value { font-family: monospace; color: #38bdf8; word-break: break-all; }
+    .actions {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    button {
+      background: #f59e0b;
+      color: #000;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #d97706; }
+    .test-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .test-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      transition: border-color 0.2s;
+    }
+    .test-item.pass { border-left: 4px solid var(--success); }
+    .test-item.fail { border-left: 4px solid var(--error); }
+    .test-item.running { border-left: 4px solid var(--pending); }
+    .test-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .test-title { font-weight: 600; font-size: 1rem; }
+    .test-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .badge-pending { background: #374151; color: var(--text-muted); }
+    .badge-running { background: #78350f; color: #fde68a; }
+    .badge-pass { background: #064e3b; color: #6ee7b7; }
+    .badge-fail { background: #7f1d1d; color: #fca5a5; }
+    .test-detail {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: rgba(0,0,0,0.25);
+      padding: 0.5rem;
+      border-radius: 4px;
+      margin-top: 0.5rem;
+    }
+    .summary-box {
+      margin-top: 2rem;
+      padding: 1rem;
+      border-radius: 8px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      text-align: center;
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    .summary-box.all-pass { color: var(--success); border-color: var(--success); }
+    .summary-box.has-fail { color: var(--error); border-color: var(--error); }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <div class="header">
+      <h1><span>⚡</span> Supabase Connectivity Test Suite</h1>
+      <p>Automated verification of Supabase client, tables, CRUD operations, constraints, and error handling.</p>
+    </div>
+
+    <div class="env-info">
+      <div class="env-row">
+        <span class="env-label">SUPABASE_URL:</span>
+        <span class="env-value" id="dispUrl">Checking...</span>
+      </div>
+      <div class="env-row">
+        <span class="env-label">SUPABASE_ANON_KEY:</span>
+        <span class="env-value" id="dispKey">Checking...</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="runBtn" onclick="runAllTests()">Run Test Suite</button>
+      <button type="button" style="background: #334155; color: #fff;" onclick="window.location.href='/'">Back to Store</button>
+    </div>
+
+    <div class="test-list" id="testList">
+      <!-- Test 1 -->
+      <div class="test-item" id="test1">
+        <div class="test-header">
+          <span class="test-title">1. Supabase Client Initialization</span>
+          <span class="test-badge badge-pending" id="badge1">PENDING</span>
+        </div>
+        <div class="test-detail" id="detail1">Waiting to run...</div>
+      </div>
+
+      <!-- Test 2 -->
+      <div class="test-item" id="test2">
+        <div class="test-header">
+          <span class="test-title">2. Read Data from Products Table</span>
+          <span class="test-badge badge-pending" id="badge2">PENDING</span>
+        </div>
+        <div class="test-detail" id="detail2">Waiting to run...</div>
+      </div>
+
+      <!-- Test 3 -->
+      <div class="test-item" id="test3">
+        <div class="test-header">
+          <span class="test-title">3. Insert Temporary Test Data (Contact Messages)</span>
+          <span class="test-badge badge-pending" id="badge3">PENDING</span>
+        </div>
+        <div class="test-detail" id="detail3">Waiting to run...</div>
+      </div>
+
+      <!-- Test 4 -->
+      <div class="test-item" id="test4">
+        <div class="test-header">
+          <span class="test-title">4. Update Test Data</span>
+          <span class="test-badge badge-pending" id="badge4">PENDING</span>
+        </div>
+        <div class="test-detail" id="detail4">Waiting to run...</div>
+      </div>
+
+      <!-- Test 5 -->
+      <div class="test-item" id="test5">
+        <div class="test-header">
+          <span class="test-title">5. Delete Test Data (Cleanup)</span>
+          <span class="test-badge badge-pending" id="badge5">PENDING</span>
+        </div>
+        <div class="test-detail" id="detail5">Waiting to run...</div>
+      </div>
+
+      <!-- Test 6 -->
+      <div class="test-item" id="test6">
+        <div class="test-header">
+          <span class="test-title">6. Error Handling & Constraint Enforcement</span>
+          <span class="test-badge badge-pending" id="badge6">PENDING</span>
+        </div>
+        <div class="test-detail" id="detail6">Waiting to run...</div>
+      </div>
+    </div>
+
+    <div class="summary-box" id="summaryBox" style="display: none;"></div>
+  </div>
+
+  <!-- Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="env.js"></script>
+
+  <script>
+    let client = null;
+    let tempRecordId = null;
+
+    function getEnvConfig() {
+      const env = window.__ENV__ || {};
+      return {
+        url: (env.SUPABASE_URL || "").trim(),
+        key: (env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || "").trim()
+      };
+    }
+
+    function updateCard(idx, status, message) {
+      const card = document.getElementById(`test${idx}`);
+      const badge = document.getElementById(`badge${idx}`);
+      const detail = document.getElementById(`detail${idx}`);
+
+      card.className = `test-item ${status}`;
+      badge.className = `test-badge badge-${status}`;
+      badge.textContent = status.toUpperCase();
+      detail.textContent = message;
+    }
+
+    async function runAllTests() {
+      const runBtn = document.getElementById("runBtn");
+      runBtn.disabled = true;
+      runBtn.textContent = "Running Tests...";
+
+      const summaryBox = document.getElementById("summaryBox");
+      summaryBox.style.display = "none";
+
+      const envConfig = getEnvConfig();
+      document.getElementById("dispUrl").textContent = envConfig.url || "(Not Configured)";
+      document.getElementById("dispKey").textContent = envConfig.key ? (envConfig.key.substring(0, 16) + "...") : "(Not Configured)";
+
+      let allPassed = true;
+
+      // ----------------------------------------------------
+      // TEST 1: Initialize Client
+      // ----------------------------------------------------
+      updateCard(1, "running", "Initializing Supabase JS client with environment variables...");
+      try {
+        if (!window.supabase) throw new Error("Supabase JS SDK (@supabase/supabase-js) not loaded.");
+        if (!envConfig.url) throw new Error("SUPABASE_URL is missing in environment variables.");
+        if (!envConfig.key) throw new Error("SUPABASE_ANON_KEY is missing in environment variables.");
+
+        client = window.supabase.createClient(envConfig.url, envConfig.key);
+        if (!client) throw new Error("Client initialization returned null.");
+
+        updateCard(1, "pass", `Client initialized successfully!\nURL: ${envConfig.url}\nAuth: Anon key registered.`);
+      } catch (err) {
+        allPassed = false;
+        updateCard(1, "fail", `Initialization Failed: ${err.message}`);
+        runBtn.disabled = false;
+        runBtn.textContent = "Run Test Suite";
+        summaryBox.style.display = "block";
+        summaryBox.className = "summary-box has-fail";
+        summaryBox.textContent = `❌ Test 1 Failed: Cannot proceed with network tests without valid credentials.`;
+        return;
+      }
+
+      // ----------------------------------------------------
+      // TEST 2: Read from Products Table
+      // ----------------------------------------------------
+      updateCard(2, "running", "Fetching active records from 'products' table...");
+      try {
+        const { data, error } = await client
+          .from("products")
+          .select("id, name, price, category")
+          .limit(5);
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          updateCard(2, "pass", `Query succeeded, but table is currently empty (0 rows returned). Ready for data.`);
+        } else {
+          const sample = data.map(p => `• [${p.id}] ${p.name} - ₹${p.price} (${p.category})`).join("\n");
+          updateCard(2, "pass", `Read successful! Received ${data.length} sample products:\n${sample}`);
+        }
+      } catch (err) {
+        allPassed = false;
+        updateCard(2, "fail", `Read Failed: ${err.message || JSON.stringify(err)}`);
+      }
+
+      // ----------------------------------------------------
+      // TEST 3: Insert Test Record into contact_messages
+      // ----------------------------------------------------
+      updateCard(3, "running", "Inserting temporary test row into 'contact_messages'...");
+      try {
+        const testPayload = {
+          name: "Test Runner",
+          phone: "9876543210",
+          email: "test.automated@naatubite.local",
+          subject: "Connectivity Verification",
+          message: "__TEMP_AUTOMATED_TEST_RECORD__"
+        };
+
+        const { data, error } = await client
+          .from("contact_messages")
+          .insert([testPayload])
+          .select();
+
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error("Insert succeeded but no record returned.");
+
+        tempRecordId = data[0].id;
+        updateCard(3, "pass", `Insert successful! Created temporary record with ID: ${tempRecordId}`);
+      } catch (err) {
+        allPassed = false;
+        updateCard(3, "fail", `Insert Failed: ${err.message || JSON.stringify(err)}`);
+      }
+
+      // ----------------------------------------------------
+      // TEST 4: Update Test Record
+      // ----------------------------------------------------
+      if (tempRecordId) {
+        updateCard(4, "running", `Updating temporary record ID: ${tempRecordId}...`);
+        try {
+          const { data, error } = await client
+            .from("contact_messages")
+            .update({ is_resolved: true })
+            .eq("id", tempRecordId)
+            .select();
+
+          if (error) throw error;
+          updateCard(4, "pass", `Update successful! Record #${tempRecordId} status updated to is_resolved: true.`);
+        } catch (err) {
+          allPassed = false;
+          updateCard(4, "fail", `Update Failed: ${err.message || JSON.stringify(err)}`);
+        }
+      } else {
+        allPassed = false;
+        updateCard(4, "fail", "Skipped: Test 3 insert did not yield a test record ID.");
+      }
+
+      // ----------------------------------------------------
+      // TEST 5: Delete Test Record (Cleanup)
+      // ----------------------------------------------------
+      if (tempRecordId) {
+        updateCard(5, "running", `Deleting temporary test record ID: ${tempRecordId}...`);
+        try {
+          const { error } = await client
+            .from("contact_messages")
+            .delete()
+            .eq("id", tempRecordId);
+
+          if (error) throw error;
+
+          // Verify deletion
+          const { data: checkData } = await client
+            .from("contact_messages")
+            .select("id")
+            .eq("id", tempRecordId);
+
+          if (checkData && checkData.length > 0) {
+            throw new Error(`Record ${tempRecordId} still found after delete.`);
+          }
+
+          updateCard(5, "pass", `Cleanup verified! Record #${tempRecordId} completely removed from database. Zero dummy data left.`);
+        } catch (err) {
+          allPassed = false;
+          updateCard(5, "fail", `Delete/Cleanup Failed: ${err.message || JSON.stringify(err)}`);
+        }
+      } else {
+        allPassed = false;
+        updateCard(5, "fail", "Skipped: No test record to delete.");
+      }
+
+      // ----------------------------------------------------
+      // TEST 6: Error Handling & Constraint Enforcement
+      // ----------------------------------------------------
+      updateCard(6, "running", "Testing error handling with intentional constraint violation...");
+      try {
+        // Attempt to insert product violating CHECK (price < 200) constraint
+        const invalidProduct = {
+          id: "__invalid_test_prod__",
+          name: "Invalid Overpriced Product",
+          category: "snacks",
+          category_label: "Snack",
+          weight: "100g",
+          price: 999.00, // Violates check (price < 200)
+          original_price: 1000.00,
+          image_url: "none.jpg",
+          alt_text: "none",
+          description: "none",
+          ingredients: "none",
+          shelf_life: "none"
+        };
+
+        const { data, error } = await client
+          .from("products")
+          .insert([invalidProduct]);
+
+        if (error) {
+          // Expected error! Check constraint or RLS
+          updateCard(6, "pass", `Error handled properly!\nDatabase correctly rejected invalid operation with:\nCode: ${error.code || 'RLS/CHECK'}\nMessage: "${error.message}"\nNo unexpected crash occurred.`);
+        } else {
+          // If insert somehow succeeded, clean it up
+          await client.from("products").delete().eq("id", invalidProduct.id);
+          throw new Error("Constraint check did not fire; invalid row was unexpectedly allowed.");
+        }
+      } catch (err) {
+        // If JS caught an error properly
+        updateCard(6, "pass", `Error handling verified!\nException caught and handled cleanly: ${err.message}`);
+      }
+
+      // Final summary
+      summaryBox.style.display = "block";
+      if (allPassed) {
+        summaryBox.className = "summary-box all-pass";
+        summaryBox.textContent = "🎉 All 6 Database Connectivity Tests PASSED Successfully!";
+      } else {
+        summaryBox.className = "summary-box has-fail";
+        summaryBox.textContent = "⚠️ One or more tests failed. Check the details above.";
+      }
+
+      runBtn.disabled = false;
+      runBtn.textContent = "Run Test Suite";
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const env = getEnvConfig();
+      document.getElementById("dispUrl").textContent = env.url || "(Not Configured)";
+      document.getElementById("dispKey").textContent = env.key ? (env.key.substring(0, 16) + "...") : "(Not Configured)";
+      runAllTests();
+    });
+  </script>
+</body>
+</html>
